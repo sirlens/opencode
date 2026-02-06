@@ -1,112 +1,68 @@
-- To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
-- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
-- Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
+# OpenCode AI Agent Guidelines
 
-## Style Guide
+This document provides context and instructions for AI agents working on the OpenCode codebase.
+
+## Project Overview
+
+OpenCode is an open-source AI coding agent built with a monorepo structure using Bun and Turborepo. It follows a client-server architecture.
+
+### Key Packages
+- `packages/opencode`: Core business logic, headless server (Hono), and TUI (SolidJS + OpenTUI).
+- `packages/app`: Web application frontend (SolidJS + Vite).
+- `packages/desktop`: Desktop application (Tauri wrapping the web app).
+- `packages/ui`: Shared UI components.
+- `packages/sdk`: SDK for client-server communication.
+- `infra`: Infrastructure code (SST).
+
+## Architecture & Core Logic
+
+### Agents (`packages/opencode/src/agent/`)
+- Agents define behavior, prompts, and permissions.
+- Modes: `primary`, `subagent`.
+- Core agents: `build` (default), `plan` (read-only), `explore` (fast navigation).
+
+### Tools (`packages/opencode/src/tool/`)
+- Tools are the primary way agents interact with the system.
+- Implementation: Use `Tool.define(name, { description, parameters, execute })`.
+- All tool inputs must be validated with Zod schemas.
+
+### Providers (`packages/opencode/src/provider/`)
+- LLM integration layer using Vercel AI SDK.
+- Agnostic to model providers (Anthropic, OpenAI, Gemini, Bedrock, etc.).
+
+### Server & SDK
+- Server: `packages/opencode/src/server/server.ts`.
+- **Note**: When modifying server endpoints, run `./script/generate.ts` to regenerate the SDK.
+
+## Development Commands
+
+- **Install**: `bun install`
+- **Root Dev**: `bun dev` (runs TUI in `packages/opencode`)
+- **Headless Server**: `bun dev serve`
+- **Web App**: `bun run --cwd packages/app dev`
+- **Desktop App**: `bun run --cwd packages/desktop tauri dev`
+- **Typecheck**: `bun run typecheck`
+- **Test**: `bun test` (run in `packages/opencode` for core logic)
+
+## Style Guide & Conventions
 
 ### General Principles
+- **Early Returns**: Avoid `else` statements; use early returns for control flow.
+- **Naming**: Prefer single-word concise names (camelCase for variables, PascalCase for namespaces).
+- **Functions**: Keep logic in one function unless it's clearly reusable/composable.
+- **Async**: Prefer `const foo = await condition ? 1 : 2` over `let`.
+- **Types**: Use precise types; avoid `any`. Rely on type inference where possible.
+- **Bun APIs**: Use Bun-native APIs (e.g., `Bun.file()`, `Bun.password()`) when applicable.
+- **Parallelism**: ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 
-- Keep things in one function unless composable or reusable
-- Avoid `try`/`catch` where possible
-- Avoid using the `any` type
-- Prefer single word variable names where possible
-- Use Bun APIs when possible, like `Bun.file()`
-- Rely on type inference when possible; avoid explicit type annotations or interfaces unless necessary for exports or clarity
-- Prefer functional array methods (flatMap, filter, map) over for loops; use type guards on filter to maintain type inference downstream
+### State Management (Frontend)
+- **SolidJS**: Prefer `createStore` over multiple `createSignal` calls for complex state.
 
-### Naming
+## Testing Guidelines
+- Avoid mocks; test actual implementations.
+- Do not duplicate logic into tests.
+- Run `bun test` in the relevant package directory.
 
-Prefer single word names for variables and functions. Only use multiple words if necessary.
-
-```ts
-// Good
-const foo = 1
-function journal(dir: string) {}
-
-// Bad
-const fooBar = 1
-function prepareJournal(dir: string) {}
-```
-
-Reduce total variable count by inlining when a value is only used once.
-
-```ts
-// Good
-const journal = await Bun.file(path.join(dir, "journal.json")).json()
-
-// Bad
-const journalPath = path.join(dir, "journal.json")
-const journal = await Bun.file(journalPath).json()
-```
-
-### Destructuring
-
-Avoid unnecessary destructuring. Use dot notation to preserve context.
-
-```ts
-// Good
-obj.a
-obj.b
-
-// Bad
-const { a, b } = obj
-```
-
-### Variables
-
-Prefer `const` over `let`. Use ternaries or early returns instead of reassignment.
-
-```ts
-// Good
-const foo = condition ? 1 : 2
-
-// Bad
-let foo
-if (condition) foo = 1
-else foo = 2
-```
-
-### Control Flow
-
-Avoid `else` statements. Prefer early returns.
-
-```ts
-// Good
-function foo() {
-  if (condition) return 1
-  return 2
-}
-
-// Bad
-function foo() {
-  if (condition) return 1
-  else return 2
-}
-```
-
-### Schema Definitions (Drizzle)
-
-Use snake_case for field names so column names don't need to be redefined as strings.
-
-```ts
-// Good
-const table = sqliteTable("session", {
-  id: text().primaryKey(),
-  project_id: text().notNull(),
-  created_at: integer().notNull(),
-})
-
-// Bad
-const table = sqliteTable("session", {
-  id: text("id").primaryKey(),
-  projectID: text("project_id").notNull(),
-  createdAt: integer("created_at").notNull(),
-})
-```
-
-## Testing
-
-- Avoid mocks as much as possible
-- Test actual implementation, do not duplicate logic into tests
+## Maintenance
+- To regenerate the JavaScript SDK: `./packages/sdk/js/script/build.ts`.
+- The default branch is `dev`. Use `dev` or `origin/dev` for diffs.
