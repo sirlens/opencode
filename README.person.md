@@ -33,6 +33,8 @@ Los agentes definen el comportamiento y las capacidades. Existen agentes primari
 - **plan**: Agente de solo lectura para análisis.
 - **explore**: Especializado en navegar y entender bases de código rápidamente.
 
+**Nota sobre la orquestación:** OpenCode no utiliza un sistema de grafos rígido. En su lugar, utiliza un modelo de **delegación recursiva** mediante la herramienta `task`. Un agente puede invocar a otro (subagente) para resolver una subtarea específica, creando una jerarquía de sesiones. Definir nuevos agentes en la configuración es una práctica recomendada y no rompe el funcionamiento nativo; permite especializar roles con diferentes prompts y permisos.
+
 ### Herramientas (Tools) (`packages/opencode/src/tool/`)
 
 Las herramientas son las acciones que el agente puede ejecutar (leer archivos, ejecutar comandos bash, buscar en la web).
