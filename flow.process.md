@@ -100,8 +100,57 @@ La jerarquía de sesiones se gestiona en `packages/opencode/src/session/index.ts
 
 Esta arquitectura permite que OpenCode sea **recursivo y modular**, manteniendo cada subtarea aislada y permitiendo que agentes especializados realicen el trabajo pesado de forma atómica.
 
-## Nota sobre A2A (Agent-to-Agent) y Orquestación Externa
-Para mayor claridad sobre la comunicación entre agentes:
-1. **A2A Nativo**: OpenCode implementa A2A mediante el paso de mensajes entre sesiones jerárquicas gestionado por la herramienta `task`.
-2. **Sin ADK de Google**: El proyecto **no utiliza el ADK de Google** para orquestación.
-3. **Protocolos Estándar**: Implementa el protocolo **ACP (Agent Client Protocol)** para interactuar con clientes (como editores de código) y utiliza el **Vercel AI SDK** para la abstracción de modelos, pero la orquestación lógica es 100% propietaria del sistema de sesiones del proyecto.
+## Inmersión en A2A (Agent-to-Agent) y Orquestación Nativa
+
+Para entender cómo OpenCode logra que un agente hable con otro sin usar librerías externas como Google ADK, debemos observar tres capas: la **Inyección**, la **Instanciación** y la **Ejecución Recursiva**.
+
+### 1. La "Inyección" (Registro de Herramientas)
+Ubicación: `packages/opencode/src/tool/registry.ts`
+
+El sistema no utiliza un "inyector de dependencias" clásico de Java/C#, sino un **Registro de Herramientas**. En la función `all()`, se "inyectan" las herramientas básicas que todos los agentes pueden ver, incluida `TaskTool`.
+
+```typescript
+// packages/opencode/src/tool/registry.ts
+async function all(): Promise<Tool.Info[]> {
+  return [
+    // ... otras herramientas
+    TaskTool, // Aquí se "inyecta" la capacidad de A2A
+    // ...
+  ]
+}
+```
+
+### 2. La Instanciación del Contexto
+Ubicación: `packages/opencode/src/session/prompt.ts` -> `resolveTools`
+
+Antes de que el LLM reciba el mensaje, el sistema prepara su "caja de herramientas". Aquí es donde se le da al agente el **Contexto de Ejecución**, que incluye el `sessionID` actual y el `abortSignal`.
+
+```typescript
+// packages/opencode/src/session/prompt.ts
+async function resolveTools(input: { ... }) {
+  const context = (args, options): Tool.Context => ({
+    sessionID: input.session.id,
+    // ...
+  });
+  // ... transforma las herramientas del registro en funciones usables por el LLM
+}
+```
+
+### 3. El Flujo de Uso A2A (Paso a Paso)
+
+El flujo exacto de una comunicación entre agentes es:
+
+1.  **Activación**: El LLM (Agente A) decide que no puede resolver algo solo y emite un `tool-call` de la herramienta `task`.
+2.  **Captura**: El `SessionProcessor` (`processor.ts`) detecta la llamada y ejecuta `TaskTool.execute`.
+3.  **Bifurcación**: `TaskTool` crea una **sesión hija** atómica en la base de datos.
+4.  **Recursión (A2A)**: `TaskTool` llama de nuevo a `SessionPrompt.prompt` pero pasando el ID de la **sesión hija** y el tipo del **Agente B** (ej. `explore`).
+5.  **Aislamiento**: El Agente B resuelve su tarea en su propia burbuja de contexto (sesión hija).
+6.  **Retorno**: El Agente B termina, y `TaskTool` captura su última respuesta de texto, devolviéndola como el resultado de la herramienta al Agente A.
+
+### ¿Por qué es "Nativo"?
+Es nativo porque **OpenCode reutiliza su propio punto de entrada (`prompt`) para ejecutar subagentes**. No hay una capa intermedia de orquestación ni grafos externos; es simplemente una función llamándose a sí misma (recursividad) pero con diferentes parámetros de sesión y agente.
+
+### Resumen de Protocolos
+- **Comunicación Interna (A2A)**: Basada en el sistema de sesiones de OpenCode.
+- **Comunicación Externa (Editor/IDE)**: Usa **ACP (Agent Client Protocol)**, definido en `packages/opencode/src/acp/`.
+- **Abstracción de Modelos**: Usa **Vercel AI SDK**, permitiendo que cualquier modelo pueda realizar estas llamadas a herramientas.
