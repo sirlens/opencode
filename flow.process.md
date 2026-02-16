@@ -99,3 +99,9 @@ La jerarquía de sesiones se gestiona en `packages/opencode/src/session/index.ts
 6.  **`processor.ts` (Sesión A)**: El LLM original recibe el resumen y ahora tiene contexto para realizar el cambio real usando la herramienta `edit`.
 
 Esta arquitectura permite que OpenCode sea **recursivo y modular**, manteniendo cada subtarea aislada y permitiendo que agentes especializados realicen el trabajo pesado de forma atómica.
+
+## Nota sobre A2A (Agent-to-Agent) y Orquestación Externa
+Para mayor claridad sobre la comunicación entre agentes:
+1. **A2A Nativo**: OpenCode implementa A2A mediante el paso de mensajes entre sesiones jerárquicas gestionado por la herramienta `task`.
+2. **Sin ADK de Google**: El proyecto **no utiliza el ADK de Google** para orquestación.
+3. **Protocolos Estándar**: Implementa el protocolo **ACP (Agent Client Protocol)** para interactuar con clientes (como editores de código) y utiliza el **Vercel AI SDK** para la abstracción de modelos, pero la orquestación lógica es 100% propietaria del sistema de sesiones del proyecto.
